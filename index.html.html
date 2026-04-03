@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>SAMCRO SYSTEM</title>
+
+<style>
+
+body {
+  margin:0;
+  font-family: 'Arial Black', sans-serif;
+  color:white;
+  background: url("https://e0.pxfuel.com/wallpapers/9/327/desktop-wallpaper-soa-clay-sons-of-anarchy.jpg") no-repeat center center fixed;
+  background-size: cover;
+}
+
+body::before {
+  content:"";
+  position:fixed;
+  width:100%;
+  height:100%;
+  background: rgba(0,0,0,0.85);
+  z-index:-1;
+}
+
+.container {
+  display:flex;
+  height:100vh;
+  padding:20px;
+  gap:20px;
+}
+
+.card {
+  background: rgba(20,20,20,0.9);
+  border-radius:15px;
+  padding:20px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.8);
+}
+
+.left {
+  width:40%;
+  overflow:auto;
+}
+
+.right {
+  width:60%;
+  display:flex;
+  flex-direction:column;
+}
+
+.service {
+  display:flex;
+  justify-content:space-between;
+  padding:12px;
+  margin:8px 0;
+  background:#111;
+  border-radius:10px;
+  transition:0.3s;
+}
+
+.service:hover {
+  background:#1a1a1a;
+  transform: scale(1.02);
+}
+
+button {
+  background:#8b0000;
+  border:none;
+  padding:10px 15px;
+  border-radius:8px;
+  color:white;
+  cursor:pointer;
+  font-weight:bold;
+  transition:0.3s;
+}
+
+button:hover {
+  background:#ff0000;
+  box-shadow:0 0 10px red;
+}
+
+.cart-item {
+  background:#111;
+  padding:12px;
+  margin:6px 0;
+  border-radius:10px;
+}
+
+.total {
+  font-size:26px;
+  margin-top:15px;
+  color:#ff4444;
+}
+
+.history {
+  margin-top:20px;
+  max-height:200px;
+  overflow:auto;
+}
+
+.success { color:#22c55e; }
+.error { color:#ff4444; }
+
+textarea {
+  width:100%;
+  margin-top:10px;
+  padding:10px;
+  border-radius:8px;
+  border:none;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="left card">
+<h2>🔧 SERVICIOS</h2>
+<div id="services"></div>
+</div>
+
+<div class="right">
+
+<div class="card">
+<h2>💀 VENTA</h2>
+<div id="cart"></div>
+<div class="total">TOTAL: $<span id="total">0</span></div>
+
+<textarea id="nota" placeholder="Nota (opcional)..."></textarea>
+
+<button onclick="enviarVenta()">ENVIAR</button>
+<div id="msg"></div>
+</div>
+
+<div class="card history">
+<h3>📜 HISTORIAL</h3>
+<div id="historial"></div>
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+// 🔥 WEBHOOK LISTO
+const WEBHOOK = "https://discord.com/api/webhooks/1489631880402829322/LiUPFJs0PZgx8EfDkksbIjn0DWSBq0o2MIxHsRPib0HBxhKucqwVnTu9UD9yiF73kMUO";
+
+// SERVICIOS
+const servicios = [
+  { nombre:"Pintura", precio:3500 },
+  { nombre:"Ruedas", precio:3500 },
+  { nombre:"Radio", precio:200000 },
+  { nombre:"Luces", precio:35000 },
+  { nombre:"Reparación", precio:3500 },
+  { nombre:"Full Rendimiento", precio:53000 }
+];
+
+let carrito = [];
+let historial = JSON.parse(localStorage.getItem("historial")) || [];
+let editIndex = null;
+
+// RENDER SERVICIOS
+function renderServicios(){
+  let html="";
+  servicios.forEach((s,i)=>{
+    html += `
+    <div class="service">
+      ${s.nombre} - $${s.precio}
+      <button onclick="add(${i})">+</button>
+    </div>`;
+  });
+  document.getElementById("services").innerHTML = html;
+}
+
+// AGREGAR
+function add(i){
+  const item = servicios[i];
+  const existe = carrito.find(x=>x.nombre===item.nombre);
+
+  if(existe){
+    existe.cantidad++;
+  } else {
+    carrito.push({...item, cantidad:1});
+  }
+
+  renderCart();
+}
+
+// CARRITO
+function renderCart(){
+  let html="";
+  let total=0;
+
+  carrito.forEach((c,i)=>{
+    total += c.precio*c.cantidad;
+
+    html += `
+    <div class="cart-item">
+      ${c.nombre} x${c.cantidad} = $${c.precio*c.cantidad}
+      <button onclick="remove(${i})">X</button>
+    </div>`;
+  });
+
+  document.getElementById("cart").innerHTML = html;
+  document.getElementById("total").innerText = total;
+}
+
+// ELIMINAR ITEM
+function remove(i){
+  carrito.splice(i,1);
+  renderCart();
+}
+
+// ENVIAR
+function enviarVenta(){
+
+  if(carrito.length===0){
+    msg("Agrega servicios","error");
+    return;
+  }
+
+  let lista="";
+  carrito.forEach(c=>{
+    lista += `${c.nombre} x${c.cantidad}\n`;
+  });
+
+  const total = document.getElementById("total").innerText;
+  const nota = document.getElementById("nota").value;
+
+  const payload = {
+    embeds:[{
+      title:"💀 VENTA SAMCRO",
+      description:lista,
+      fields:[
+        {name:"TOTAL", value:`$${total}`},
+        {name:"NOTA", value: nota || "Sin nota"}
+      ],
+      color:16711680,
+      timestamp:new Date()
+    }]
+  };
+
+  fetch(WEBHOOK,{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify(payload)
+  })
+  .then(res=>{
+    if(res.ok){
+      saveHistory();
+      carrito=[];
+      renderCart();
+      msg("ENVIADO 🚀","success");
+    } else throw new Error();
+  })
+  .catch(()=>msg("ERROR","error"));
+}
+
+// HISTORIAL
+function saveHistory(){
+  const venta={
+    carrito:[...carrito],
+    total: document.getElementById("total").innerText
+  };
+
+  if(editIndex!==null){
+    historial[editIndex]=venta;
+    editIndex=null;
+  } else {
+    historial.push(venta);
+  }
+
+  localStorage.setItem("historial", JSON.stringify(historial));
+  renderHistory();
+}
+
+// RENDER HISTORIAL
+function renderHistory(){
+  let html="";
+  historial.forEach((h,i)=>{
+    html += `
+    <div class="cart-item">
+      Venta $${h.total}
+      <button onclick="edit(${i})">Editar</button>
+      <button onclick="del(${i})">Eliminar</button>
+    </div>`;
+  });
+
+  document.getElementById("historial").innerHTML = html;
+}
+
+// EDITAR
+function edit(i){
+  carrito=[...historial[i].carrito];
+  editIndex=i;
+  renderCart();
+}
+
+// BORRAR
+function del(i){
+  historial.splice(i,1);
+  localStorage.setItem("historial", JSON.stringify(historial));
+  renderHistory();
+}
+
+// MENSAJES
+function msg(t, tipo){
+  document.getElementById("msg").innerHTML =
+    `<p class="${tipo}">${t}</p>`;
+}
+
+// INIT
+renderServicios();
+renderCart();
+renderHistory();
+
+</script>
+
+</body>
+</html>
